@@ -1,0 +1,26 @@
+{
+  "77e7fc9e-3589-48ac-b290-f28a293063ef": {
+    "id": "77e7fc9e-3589-48ac-b290-f28a293063ef",
+    "address": "0xd115a29bdf33f6db712dc514721fbfa9b522505c",
+    "createdAt": 1717584175614,
+    "userPermission": "user"
+  },
+  "2bb52a12-3d73-4be2-bdcc-e5af18bd7a16": {
+    "id": "2bb52a12-3d73-4be2-bdcc-e5af18bd7a16",
+    "address": "0x2d62c27ce2e9e66bb8a667ce1b60f7cb02fa9810",
+    "createdAt": 1717584175615,
+    "userPermission": "user"
+  },
+  "97e9daff-8021-4d6f-af24-d8b70755ec69": {
+    "id": "97e9daff-8021-4d6f-af24-d8b70755ec69",
+    "address": "0xd115a29bdf33f6db712dc514721fbfa9b522505c",
+    "createdAt": 1717608170967,
+    "userPermission": "user"
+  },
+  "3c185edf-c798-4a5f-9920-f5595aac7a16": {
+    "id": "3c185edf-c798-4a5f-9920-f5595aac7a16",
+    "address": "0x2d62c27ce2e9e66bb8a667ce1b60f7cb02fa9810",
+    "createdAt": 1717608170968,
+    "userPermission": "user"
+  }
+}
