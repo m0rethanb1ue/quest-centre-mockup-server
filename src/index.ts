@@ -1,10 +1,51 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck
 import chalk from 'chalk'
 import express from 'express'
-import { Action, QuestInfo, QuestTypes } from './db/tables.js'
+import { QuestInfo, Reward } from './db/tables.js'
 import bodyParser from 'body-parser'
 import _ from 'lodash'
+import { getActivities, getParticipantId, getSponsor } from './db/controller.js'
+
+import { JSONFilePreset } from 'lowdb/node'
+import { initTimestamp, uuidv4 } from './utils.js'
+
+export const ParticipantAction = await JSONFilePreset(
+  'participant-action.json',
+  {},
+)
+await ParticipantAction.write()
+
+export const getParticipantAction = (user_address: string) => {
+  const participant_id = getParticipantId(user_address)
+  const current_participant_action = _.get(
+    ParticipantAction.data,
+    participant_id,
+    {},
+  )
+
+  return Object.values(current_participant_action)
+}
+
+export const createParticipantAction = async (
+  user_address: string,
+  action_id: string,
+) => {
+  try {
+    const participant_id = getParticipantId(user_address)
+    const participant_action_id = uuidv4()
+    const created_action = {
+      id: participant_action_id,
+      participant_id: participant_id,
+      action_id: action_id,
+      created_at: initTimestamp(),
+      updated_at: initTimestamp(),
+    }
+
+    return created_action
+  } catch (error) {
+    return null
+  }
+}
 
 const PORT = 3001
 
@@ -17,22 +58,92 @@ server.get('/ping', (_, response) => response.send('pong!'))
 
 server.get('/quests', async (request, response) => {
   const limit = _.get(request.query, 'limit', 5)
+  // @ts-expect-error
   response.send(Object.values(QuestInfo.data).slice(0, limit))
 })
 
 server.get('/quest-activities', async (request, response) => {
-  const type_id = _.get(request.query, 'quest_type_id', '')
+  const quest_type_id = _.get(request.query, 'quest_type_id', '')
+  // @ts-expect-error
+  response.send(getActivities(quest_type_id))
+})
 
-  const activities = _.get(
-    QuestTypes.data,
-    `${type_id}.pre_condition_action_ids`,
-    [],
-  ).reduce(
-    (accumulator, actionId) => accumulator.concat(Action.data[actionId]),
-    [],
+server.get('/sponsor-info', async (request, response) => {
+  const campaign_id = _.get(request.query, 'campaign_id', '')
+  // @ts-expect-error
+  const sponsor = getSponsor(campaign_id)
+  response.send(sponsor)
+})
+
+server.get('/reward', async (request, response) => {
+  const quest_id = _.get(request.query, 'quest_id', '')
+  const reward = Object.values(Reward.data).filter(
+    // @ts-expect-error
+    reward => reward.quest_id === quest_id,
   )
+  response.send(reward)
+})
 
-  response.send(activities)
+server.post('/take-activity', async (request, response) => {
+  try {
+    const participant_id = getParticipantId(
+      _.get(request.body, 'user_address', ''),
+    )
+
+    const action_id = _.get(request.body, 'action_id', '')
+    const quest_type_id = _.get(request.body, 'quest_type_id', '')
+
+    if (!_.get(ParticipantAction.data, participant_id)) {
+      await ParticipantAction.update(data =>
+        Object.assign(data, { [participant_id]: {} }),
+      )
+    }
+
+    const participant_actions = _.get(ParticipantAction.data, participant_id)
+    const next_id = [quest_type_id, action_id].join('#')
+
+    if (_.get(participant_actions, next_id)) {
+      response.send(true)
+      return
+    }
+
+    const next_action = {
+      id: next_id,
+      participant_id,
+      action_id,
+      created_at: initTimestamp(),
+      updated_at: initTimestamp(),
+    }
+
+    participant_actions[next_id] = next_action
+    await ParticipantAction.update(data =>
+      Object.assign(data, { [participant_id]: participant_actions }),
+    )
+    response.send(true)
+  } catch (error) {
+    console.error(error)
+    response.send(false)
+  }
+})
+
+server.post('/verify-precondition', async (request, response) => {
+  const user_address = _.get(request.body, 'user_address', '')
+  const action_ids: string[] = _.get(request.body, 'action_ids', [])
+  const quest_id = _.get(request.body, 'quest_type_id', [])
+
+  const participant_action = getParticipantAction(user_address)
+    // @ts-expect-error
+    .filter(p_action => p_action.id.split('#')[0] === quest_id)
+    // @ts-expect-error
+    .map(p_action => p_action.id)
+
+  const result = Array(action_ids.length).fill(false)
+
+  for (let index = 0; index < action_ids.length; index++) {
+    result[index] = participant_action[index] === action_ids[index]
+  }
+
+  response.send(result)
 })
 
 server.listen(PORT, () => console.log(chalk.cyan(`[${PORT}] Server Ready!`)))

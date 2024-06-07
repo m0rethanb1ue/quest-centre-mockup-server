@@ -1,15 +1,16 @@
-import {
-  OperatorAddresses,
-  SponsorAddresses,
-  UserAddresses,
-} from '../addresses.js'
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+import _ from 'lodash'
+import { OperatorAddresses, UserAddresses } from '../addresses.js'
+import { Tokens } from '../constants.js'
 import {
   ACTION_TYPE,
+  DISTRIBUTION_TYPE,
   FREQUENCY,
   PERMISSION,
+  REWARD_TYPE,
   SECTION_TYPE,
   STATUS,
-} from '../constants.js'
+} from '../types.js'
 import {
   initTimestamp,
   makeLoremIpsum,
@@ -27,7 +28,7 @@ import {
   QuestTypes,
   Action,
   QuestInfo,
-  ParticipantAction,
+  Reward,
 } from './tables.js'
 
 const getDummyJSON = async (): Promise<Record<string, unknown>> => {
@@ -40,9 +41,7 @@ const getDummyJSON = async (): Promise<Record<string, unknown>> => {
   }
 }
 
-const initTable = async () => {
-  await Promise.all([ParticipantAction.write()])
-}
+const initTable = async () => {}
 
 const dump = async () => {
   // * get dummy data
@@ -61,14 +60,20 @@ const dump = async () => {
   await Sponsors.update(data =>
     Object.assign(
       data,
-      SponsorAddresses.reduce(accumulator => {
+      recipes.reduce((accumulator, recipe) => {
         const sponsorId = uuidv4()
         return {
           ...accumulator,
           [sponsorId]: {
             id: sponsorId,
-            name: makeName(),
+            name: recipe.cuisine,
             description: makeLoremIpsum(1),
+            logo_url: [
+              'https://em-content.zobj.net/source/apple/391/pinched-fingers_light-skin-tone_1f90c-1f3fb_1f3fb.png',
+              'https://em-content.zobj.net/source/apple/391/clown-face_1f921.png',
+              'https://em-content.zobj.net/source/apple/391/heart-hands_light-skin-tone_1faf6-1f3fb_1f3fb.png',
+            ][randomIndex(3)],
+            extra_info: { quest_id: recipe.id },
           },
         }
       }, {}),
@@ -89,7 +94,8 @@ const dump = async () => {
               PERMISSION.Admin,
               PERMISSION.Creator,
               PERMISSION.MasterAdmin,
-            ][randomInt(0, 2)],
+              PERMISSION.Viewer,
+            ][randomIndex(4)],
           },
         }
       }, {}),
@@ -120,49 +126,37 @@ const dump = async () => {
 
   await Campaign.update(data =>
     Object.assign(data, {
-      id: campaign_id,
-      approved_by: operatorIds[randomIndex(operatorIds.length)],
-      creator: operatorIds[randomIndex(operatorIds.length)],
-      sponsor: sponsorIds[randomIndex(sponsorIds.length)],
-      description: ['Master Chief', makeLoremIpsum(1).toLowerCase()].join(' '),
-      start_time: initTimestamp(),
-      end_time: initTimestamp(),
-      status: STATUS.InternalPublish,
-      organizer: makeOrganzierName(),
+      [campaign_id]: {
+        id: campaign_id,
+        approved_by: operatorIds[randomIndex(operatorIds.length)],
+        creator: operatorIds[randomIndex(operatorIds.length)],
+        sponsor: sponsorIds[randomIndex(sponsorIds.length)],
+        description: ['Master Chief', makeLoremIpsum(1).toLowerCase()].join(
+          ' ',
+        ),
+        start_time: initTimestamp(),
+        end_time: initTimestamp(),
+        status: STATUS.InternalPublish,
+        organizer: makeOrganzierName(),
+      },
     }),
   )
 
   const actions = {}
   const questInfo = {}
   const questType = {}
+  const reward = {}
 
   for await (const {
-    id: quest_info_id,
-    name: questName,
+    id: quest_id,
+    name,
     ingredients,
     instructions,
     ...rest
   } of recipes) {
-    const _actions = {
-      ...instructions.reduce((accumulator, content) => {
-        const id = uuidv4()
-        return {
-          ...accumulator,
-          [id]: {
-            id,
-            name: content,
-            description: content,
-            action_type: ACTION_TYPE.CheckIn,
-            section_type: SECTION_TYPE.Action,
-            freqency: FREQUENCY.Daily,
-            start_date: initTimestamp(),
-            end_date: initTimestamp(),
-            created_at: initTimestamp(),
-            updated_at: initTimestamp(),
-          },
-        }
-      }, {}),
-      ...ingredients.reduce((accumulator, content) => {
+    const pre_conditions = ingredients
+      .slice(0, randomInt(1, 5))
+      .reduce((accumulator, content) => {
         const id = uuidv4()
         return {
           ...accumulator,
@@ -179,14 +173,34 @@ const dump = async () => {
             updated_at: initTimestamp(),
           },
         }
-      }, {}),
-    }
+      }, {})
+
+    const quest_actions = instructions.reduce((accumulator, content) => {
+      const id = uuidv4()
+      return {
+        ...accumulator,
+        [id]: {
+          id,
+          name: content,
+          description: content,
+          action_type: ACTION_TYPE.CheckIn,
+          section_type: SECTION_TYPE.Action,
+          freqency: FREQUENCY.Daily,
+          start_date: initTimestamp(),
+          end_date: initTimestamp(),
+          created_at: initTimestamp(),
+          updated_at: initTimestamp(),
+        },
+      }
+    }, {})
+
+    const _actions = { ...pre_conditions, ...quest_actions }
 
     const quest_type_id = uuidv4()
 
     const nextQuestInfo = {
-      id: quest_info_id,
-      name: questName,
+      id: quest_id,
+      name: name,
       quest_type_id,
       campaign_id,
       description: makeLoremIpsum(1),
@@ -203,8 +217,8 @@ const dump = async () => {
 
     const nextQuestType = {
       id: quest_type_id,
-      name: questName,
-      description: questName,
+      name: name,
+      description: name,
       frequency: FREQUENCY.Daily,
       pre_condition_action_ids: Object.keys(_actions),
       pre_condition_quests_ids: [],
@@ -212,12 +226,49 @@ const dump = async () => {
       updated_at: initTimestamp(),
     }
 
+    const registeredIndex = []
+    const bunchOfReward = Array.from({ length: randomInt(5) }).reduce(
+      (accumulator: object) => {
+        const tokenIndex = randomIndex(Tokens.length)
+        if (registeredIndex.includes(tokenIndex)) {
+          return accumulator
+        }
+
+        registeredIndex.push(tokenIndex)
+        const picked_token = Tokens[tokenIndex]
+
+        const reward_id = uuidv4()
+
+        return {
+          ...accumulator,
+          [reward_id]: {
+            id: reward_id,
+            quest_id: quest_id,
+            name: picked_token.name,
+            description: makeLoremIpsum(1),
+            type: REWARD_TYPE.OnChainToken,
+            value: _.random(0.1, 3.5),
+            token_address: picked_token.contract,
+            extra_info: { logo: picked_token.logo },
+            reward_distribution_id: null,
+            distribution_type: DISTRIBUTION_TYPE.Instant,
+            distribution_time: initTimestamp(),
+            created_at: initTimestamp(),
+            updated_at: initTimestamp(),
+          },
+        }
+      },
+      {},
+    )
+
     Object.assign(actions, _actions)
-    Object.assign(questInfo, { ...questInfo, [quest_info_id]: nextQuestInfo })
+    Object.assign(reward, bunchOfReward)
+    Object.assign(questInfo, { ...questInfo, [quest_id]: nextQuestInfo })
     Object.assign(questType, { ...questType, [quest_type_id]: nextQuestType })
   }
 
   await Action.update(data => Object.assign(data, actions))
+  await Reward.update(data => Object.assign(data, reward))
   await QuestInfo.update(data => Object.assign(data, questInfo))
   await QuestTypes.update(data => Object.assign(data, questType))
 }

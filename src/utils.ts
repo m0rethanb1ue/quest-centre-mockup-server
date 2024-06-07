@@ -6,6 +6,7 @@ import {
   adjectives,
   starWars,
 } from 'unique-names-generator'
+import _ from 'lodash'
 
 export const uuidv4 = () => v4()
 
@@ -24,8 +25,7 @@ export const makeLoremIpsum = (repeat = 1) =>
     Math.floor(Math.random() * repeat) + 1,
   )
 
-export const randomInt = (min = 1, max = 3) =>
-  Math.floor(Math.random() * (max - 1 + min) + 1)
+export const randomInt = (min = 1, max = 3) => _.random(min, max)
 
 export const randomIndex = (length: number) => randomInt(0, length - 1)
 
