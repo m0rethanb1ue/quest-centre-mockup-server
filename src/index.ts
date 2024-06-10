@@ -5,7 +5,7 @@ import { QuestInfo, Reward } from './db/tables.js'
 import bodyParser from 'body-parser'
 import _ from 'lodash'
 import { getActivities, getParticipantId, getSponsor } from './db/controller.js'
-
+import morgan from 'morgan'
 import { JSONFilePreset } from 'lowdb/node'
 import { initTimestamp, uuidv4 } from './utils.js'
 
@@ -53,6 +53,7 @@ const server = express()
 
 server.use(bodyParser.json())
 server.use(bodyParser.urlencoded({ extended: false }))
+server.use(morgan('dev'))
 
 server.get('/ping', (_, response) => response.send('pong!'))
 
