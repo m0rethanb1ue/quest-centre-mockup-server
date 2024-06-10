@@ -58,19 +58,27 @@ server.get('/ping', (_, response) => response.send('pong!'))
 
 server.get('/quests', async (request, response) => {
   const limit = _.get(request.query, 'limit', 5)
-  // @ts-expect-error
   response.send(Object.values(QuestInfo.data).slice(0, limit))
+})
+
+server.get('/quests/:id', async (request, response) => {
+  const quest_id = _.get(request.params, 'id', '')
+  const quest = _.get(QuestInfo.data, quest_id)
+  if(!quest) {
+    response.status(404)
+    response.send({ error: 'not found' })
+    return
+  }
+  response.send(quest)
 })
 
 server.get('/quest-activities', async (request, response) => {
   const quest_type_id = _.get(request.query, 'quest_type_id', '')
-  // @ts-expect-error
   response.send(getActivities(quest_type_id))
 })
 
 server.get('/sponsor-info', async (request, response) => {
   const campaign_id = _.get(request.query, 'campaign_id', '')
-  // @ts-expect-error
   const sponsor = getSponsor(campaign_id)
   response.send(sponsor)
 })

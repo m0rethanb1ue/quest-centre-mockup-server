@@ -35,7 +35,6 @@ export const getPreconditionActionIds = (quest_type_id: string) => {
 }
 
 export const getActivities = (quest_type_id: string) => {
-  // @ts-expect-error
   return getPreconditionActionIds(quest_type_id).reduce(
     (accumulator, actionId) => accumulator.concat(Action.data[actionId]),
     [],
