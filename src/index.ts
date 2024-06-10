@@ -59,7 +59,15 @@ server.get('/ping', (_, response) => response.send('pong!'))
 
 server.get('/quests', async (request, response) => {
   const limit = _.get(request.query, 'limit', 5)
-  response.send(Object.values(QuestInfo.data).slice(0, limit))
+  const quests = Object.values(QuestInfo.data).slice(0, limit)
+
+  // Add rewards to each quest
+  const questsWithRewards = quests.map((quest: any) => {
+    const rewards = Object.values(Reward.data).filter((reward: any) => reward.quest_id === quest.id)
+    return { ...quest, rewards }
+  })
+
+  response.send(questsWithRewards)
 })
 
 server.get('/quests/:id', async (request, response) => {
@@ -70,7 +78,11 @@ server.get('/quests/:id', async (request, response) => {
     response.send({ error: 'not found' })
     return
   }
-  response.send(quest)
+
+  const rewards = Object.values(Reward.data).filter((reward: any) => reward.quest_id === quest.id)
+  const questWithRewards = { ...quest, rewards }
+
+  response.send(questWithRewards)
 })
 
 server.get('/quest-activities', async (request, response) => {
